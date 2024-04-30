@@ -1,0 +1,26 @@
+# Python
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Datasets
+*.csv
+
+# Dash configuration
+config.yml
+
+# Logs
+*.log
+
+# Virtual environment
+pyenv.txt
+
+# IDE settings
+.vscode/
+*.swp
+*.swo
+*.swn
+*.bak
