@@ -310,6 +310,9 @@
 - Web 端：行情、自选、基础图表、基础下单、订单/持仓/资产、价格提醒。
 - 券商：优先接入 1~2 家（建议 IBKR + 富途）。
 - 风控：交易前基础规则。
+- 详细需求拆解、业务流程图、边界场景约束、交互流程定义见：`requirements/mvp-requirements-spec.md`。
+- 前端技术方案见：`requirements/frontend-technical-solution.md`。
+- 后端技术方案见：`requirements/backend-technical-solution.md`。
 
 ## 5.2 Pro 阶段（6~12 个月）
 - 高级图表、策略回测、自定义指标脚本。
@@ -337,4 +340,3 @@
 2. 同一用户绑定两个以上券商账户后可在统一界面完成交易并追踪订单状态。
 3. Alert、订单状态、风控告警可通过至少两种通道送达。
 4. Web 与移动端核心功能行为一致，关键数据同步正确。
-
