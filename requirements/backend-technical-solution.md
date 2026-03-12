@@ -57,6 +57,8 @@
    - 站内信/邮件投递、模板渲染、状态回执。
 12. **audit-service**（审计）
    - 高风险操作审计、链路追踪、合规导出。
+13. **sim-trading-service**（模拟交易）
+   - 模拟账户、模拟撮合、模拟持仓与资产快照。
 
 ## 3.2 MVP 功能到服务映射（无遗漏）
 
@@ -74,6 +76,8 @@
 | AST-02 持仓筛选 | portfolio-service | iam-service |
 | ALT-01 价格提醒 | alert-service | market-service |
 | ALT-02 通知触达 | notification-service | alert-service, order-service |
+| SIM-01 模拟账户 | sim-trading-service | iam-service, portfolio-service |
+| SIM-02 模拟交易 | sim-trading-service | order-service, risk-service, notification-service |
 
 ---
 
@@ -114,6 +118,8 @@ type BrokerAdapter interface {
 }
 ```
 
+- 内置 `PaperBrokerAdapter`：不依赖真实券商 API，提供模拟撮合与回报，接口与真实 Adapter 完全一致。
+
 ## 5.2 统一字段模型
 - 统一订单号：`platform_order_id`（平台生成）+ `broker_order_id`（券商原生）。
 - 统一账户：`platform_account_id` 映射多券商 `broker_account_id`。
@@ -147,6 +153,12 @@ type BrokerAdapter interface {
 1. portfolio-service 按账户拉取券商资产与持仓。
 2. 汇率服务折算多币种资产。
 3. 持仓快照写库并更新缓存。
+
+## 6.4 模拟交易流程
+1. order-service 根据账户模式路由到 `sim-trading-service`。
+2. sim-trading-service 执行模拟撮合（价格、滑点、成交数量规则）。
+3. 写入模拟订单/成交/持仓快照并发布状态事件。
+4. portfolio-service 刷新模拟资产，notification-service 推送站内信。
 
 ---
 
@@ -310,6 +322,60 @@ type BrokerAdapter interface {
 
 ---
 
+## 7.6 模拟账户与模拟交易
+
+### `sim_accounts`
+- `id (pk)`
+- `user_id`
+- `currency`
+- `initial_balance`
+- `available_balance`
+- `status`
+- `created_at`
+- 索引：
+  - `uniq_sim_account_user(user_id)`
+  - `idx_sim_account_status(status, created_at desc)`
+
+### `sim_orders`
+- `id (pk)`
+- `sim_account_id`
+- `platform_order_id`
+- `symbol`
+- `side`
+- `order_type`
+- `price`
+- `quantity`
+- `filled_quantity`
+- `status`
+- `match_engine_version`
+- `created_at`
+- 索引：
+  - `uniq_sim_orders_platform(platform_order_id)`
+  - `idx_sim_orders_account_status_time(sim_account_id, status, created_at desc)`
+
+### `sim_trades`
+- `id (pk)`
+- `sim_order_id`
+- `symbol`
+- `fill_price`
+- `fill_qty`
+- `fee`
+- `trade_time`
+- 索引：`idx_sim_trades_order_time(sim_order_id, trade_time desc)`
+
+### `sim_positions`
+- `id (pk)`
+- `sim_account_id`
+- `symbol`
+- `qty_total`
+- `avg_cost`
+- `last_price`
+- `unrealized_pnl`
+- `updated_at`
+- 索引：
+  - `uniq_sim_positions_account_symbol(sim_account_id, symbol)`
+  - `idx_sim_positions_updated(updated_at desc)`
+
 ## 8. 安全与合规设计
 
 - 鉴权：OIDC + JWT（短期）+ Refresh Token（旋转）。
@@ -318,6 +384,7 @@ type BrokerAdapter interface {
 - 数据脱敏：日志脱敏（账号、订单、邮箱、手机号）。
 - 幂等与防重放：`idempotency_key + nonce + timestamp`。
 - 权限模型：RBAC（用户/运营/管理员）+ 资源级校验。
+- 数据隔离：模拟账户与真实账户采用独立表与独立查询路径，禁止同一接口混算。
 - 审计：下单/撤单/登录风控命中全量审计不可变更存储。
 - 合规：按地区配置行情授权策略与数据保留策略。
 
@@ -342,7 +409,7 @@ type BrokerAdapter interface {
 
 - M1（2周）：IAM、行情读取、基础网关。
 - M2（3周）：订单服务 + 券商网关 + 风控前置。
-- M3（2周）：资产持仓、提醒通知。
+- M3（2周）：资产持仓、提醒通知、模拟交易服务。
 - M4（2周）：审计、对账、安全加固、压测验收。
 
 ## 11. 文档版本
